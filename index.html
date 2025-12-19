@@ -3,7 +3,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Neon Stop Clock</title>
     <style>
         /* Global styles: dark theme with neon accents */
@@ -211,15 +211,16 @@
             min-width: 60px;
         }
 
-        /* Start/Stop and Reset buttons */
         .button-bar {
             padding: 15px 20px;
             display: flex;
             justify-content: center;
             gap: 20px;
             background: rgba(0, 0, 0, 0.0);
-            position: sticky;
-            top: calc(140px + env(safe-area-inset-top));
+            position: fixed;
+            bottom: calc(env(safe-area-inset-bottom) + 12px);
+            left: 0;
+            right: 0;
             z-index: 99;
         }
 
@@ -250,7 +251,7 @@
             justify-content: center;
             align-items: center;
             padding-top: 220px;
-            padding-bottom: 50px;
+            padding-bottom: 120px;
         }
 
         #display {
@@ -921,6 +922,12 @@
         addIntermediateBtn.style.display = 'none';
         volumeGroup.style.display = audibleToggle.checked ? 'flex' : 'none';
         updateDisplay();
+        // Default size: 40px on mobile, 200px on desktop
+        if (window.innerWidth <= 768) {
+            sizeSlider.value = 40;
+        } else {
+            sizeSlider.value = 200;
+        }
         updateSize();
         updateColor();
         updateVolume();
