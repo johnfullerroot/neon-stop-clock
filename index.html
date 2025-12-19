@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neon Stop Clock</title>
+    <style>
+        /* Global styles: dark theme with neon accents */
+        body {
+            background-color: black;
+            color: white;
+            font-family: monospace;
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Custom property for neon color (changed dynamically) */
+        :root {
+            --neon: #00ffff;
+        }
+
+        /* Top control ribbon with blur effect */
+        .ribbon {
+            background: rgba(0, 0, 0, 0.0);
+            backdrop-filter: blur(10px);
+            padding: 7px 10px;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+        }
+
+        .ribbon-row {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            margin-bottom: 10px;
+        }
+
+        /* Toggle switches (e.g., Count Up/Down, alarms) */
+        .toggle-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .toggle-label {
+            font-size: 16px;
+            color: var(--neon);
+            text-shadow: 0 0 5px var(--neon);
+            min-width: 120px;
+            text-align: right;
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #333;
+            transition: .4s;
+            border-radius: 34px;
+            box-shadow: 0 0 8px var(--neon);
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+            box-shadow: 0 0 10px var(--neon);
+        }
+
+        input:checked + .slider {
+            background-color: var(--neon);
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+
+        /* Countdown interval inputs (main interval) */
+        #down-inputs {
+            display: none;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .number-wrapper {
+            position: relative;
+            display: inline-block;
+        }
+
+        .number-wrapper input {
+            width: 60px;
+            background: #222;
+            color: var(--neon);
+            border: 1px solid var(--neon);
+            text-align: center;
+            font-size: 18px;
+            padding: 6px 20px 6px 6px;
+            border-radius: 4px;
+            box-shadow: 0 0 8px var(--neon);
+            -moz-appearance: textfield;
+        }
+
+        .number-wrapper input::-webkit-inner-spin-button,
+        .number-wrapper input::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+        }
+
+        .number-wrapper button {
+            position: absolute;
+            right: 4px;
+            width: 16px;
+            height: 12px;
+            background: transparent;
+            border: none;
+            color: var(--neon);
+            font-size: 10px;
+            cursor: pointer;
+            text-shadow: 0 0 5px var(--neon);
+            padding: 0;
+            line-height: 1;
+        }
+
+        .number-wrapper .spin-up { top: 2px; }
+        .number-wrapper .spin-down { bottom: 2px; }
+
+        .number-wrapper button:hover {
+            color: white;
+            text-shadow: 0 0 10px var(--neon);
+        }
+
+        .add-intermediate {
+            font-size: 28px;
+            cursor: pointer;
+            color: var(--neon);
+            text-shadow: 0 0 8px var(--neon);
+            margin-left: 10px;
+        }
+
+        .add-intermediate:hover {
+            color: white;
+            text-shadow: 0 0 15px var(--neon);
+        }
+
+        /* Sliders for color, volume, and display size */
+        .slider-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        #color-slider, #volume-slider, #size-slider {
+            -webkit-appearance: none;
+            width: 180px;
+            height: 8px;
+            border-radius: 5px;
+            background: #333;
+            outline: none;
+            box-shadow: 0 0 10px var(--neon);
+        }
+
+        #color-slider {
+            background: linear-gradient(to right, red, yellow, lime, cyan, blue, magenta, red);
+        }
+
+        #color-slider::-webkit-slider-thumb,
+        #volume-slider::-webkit-slider-thumb,
+        #size-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: var(--neon);
+            cursor: pointer;
+            box-shadow: 0 0 15px var(--neon);
+        }
+
+        #size-value, #volume-value {
+            font-size: 16px;
+            color: var(--neon);
+            min-width: 60px;
+        }
+
+        /* Start/Stop and Reset buttons */
+        .button-bar {
+            padding: 15px 20px;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            background: rgba(0, 0, 0, 0.0);
+            position: sticky;
+            top: calc(140px + env(safe-area-inset-top));
+            z-index: 99;
+        }
+
+        .button-bar button {
+            background: transparent;
+            border: 2px solid var(--neon);
+            color: var(--neon);
+            font-size: 20px;
+            padding: 12px 30px;
+            cursor: pointer;
+            text-shadow: 0 0 5px var(--neon);
+            box-shadow: 0 0 15px var(--neon);
+            border-radius: 8px;
+            transition: all 0.3s;
+        }
+
+        .button-bar button:hover {
+            background: var(--neon);
+            color: black;
+            text-shadow: none;
+            box-shadow: 0 0 30px var(--neon);
+        }
+
+        /* Main timer display area */
+        .main {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding-top: 220px;
+            padding-bottom: 50px;
+        }
+
+        #display {
+            font-size: 200px;
+            color: #fff;
+            text-shadow:
+                0 0 5px #fff,
+                0 0 10px #fff,
+                0 0 20px #fff,
+                0 0 40px var(--neon),
+                0 0 80px var(--neon),
+                0 0 90px var(--neon),
+                0 0 100px var(--neon),
+                0 0 150px var(--neon);
+            transition: font-size 0.3s ease;
+            user-select: none;
+        }
+
+        /* Visual alarm effect (flashing red) */
+        .flash {
+            color: red !important;
+            text-shadow:
+                0 0 5px red,
+                0 0 10px red,
+                0 0 20px red,
+                0 0 40px red,
+                0 0 80px red,
+                0 0 90px red,
+                0 0 100px red,
+                0 0 150px red !important;
+            animation: pulse 0.5s infinite alternate;
+        }
+
+        @keyframes pulse {
+            from { opacity: 1; }
+            to { opacity: 0.6; }
+        }
+
+        /* Modal for adding additional countdown intervals */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 200;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.8);
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background: #111;
+            padding: 20px;
+            border: 2px solid var(--neon);
+            border-radius: 10px;
+            box-shadow: 0 0 30px var(--neon);
+            width: 90%;
+            max-width: 600px;
+            position: relative;
+        }
+
+        .intermediate-row {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 15px;
+            opacity: 0.4;
+            transition: opacity 0.3s;
+        }
+
+        .intermediate-row.enabled {
+            opacity: 1;
+        }
+
+        .intermediate-row .time-inputs {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .interval-label {
+            min-width: 80px;
+            text-align: right;
+            color: var(--neon);
+        }
+
+        .modal-footer {
+            text-align: right;
+            margin-top: 20px;
+        }
+
+        .save-btn {
+            background: transparent;
+            border: 2px solid var(--neon);
+            color: var(--neon);
+            font-size: 18px;
+            padding: 10px 24px;
+            cursor: pointer;
+            text-shadow: 0 0 5px var(--neon);
+            box-shadow: 0 0 15px var(--neon);
+            border-radius: 8px;
+            transition: all 0.3s;
+        }
+
+        .save-btn:hover {
+            background: var(--neon);
+            color: black;
+            text-shadow: none;
+            box-shadow: 0 0 30px var(--neon);
+        }
+    </style>
+</head>
+<body>
+    <!-- Top control ribbon -->
+    <div class="ribbon">
+        <div class="ribbon-row">
+            <!-- Mode toggles -->
+            <div class="toggle-group">
+                <span class="toggle-label">Count Up</span>
+                <label class="switch">
+                    <input type="checkbox" id="up-toggle" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div class="toggle-group">
+                <span class="toggle-label">Count Down</span>
+                <label class="switch">
+                    <input type="checkbox" id="down-toggle">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <!-- Alarm toggles -->
+            <div class="toggle-group">
+                <span class="toggle-label">Visual Alarm</span>
+                <label class="switch">
+                    <input type="checkbox" id="visual-toggle" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div class="toggle-group">
+                <span class="toggle-label">Audible Alarm</span>
+                <label class="switch">
+                    <input type="checkbox" id="audible-toggle" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <!-- Main countdown interval inputs (Interval 1) -->
+            <div id="down-inputs">
+                <span class="interval-label">Interval 1:</span>
+                <div class="number-wrapper">
+                    <input type="number" id="hours" min="0" value="0">
+                    <button class="spin-up">▲</button>
+                    <button class="spin-down">▼</button>
+                </div> :
+                <div class="number-wrapper">
+                    <input type="number" id="minutes" min="0" max="59" value="0">
+                    <button class="spin-up">▲</button>
+                    <button class="spin-down">▼</button>
+                </div> :
+                <div class="number-wrapper">
+                    <input type="number" id="seconds" min="0" max="59" value="0">
+                    <button class="spin-up">▲</button>
+                    <button class="spin-down">▼</button>
+                </div>
+                <span class="add-intermediate" id="add-intermediate" title="Add more intervals">+</span>
+            </div>
+        </div>
+        <div class="ribbon-row">
+            <!-- Customization sliders -->
+            <div class="slider-group">
+                <span class="toggle-label">Colour</span>
+                <input type="range" id="color-slider" min="0" max="360" value="180">
+            </div>
+            <div class="slider-group" id="volume-slider-group">
+                <span class="toggle-label">Volume</span>
+                <input type="range" id="volume-slider" min="0" max="100" value="70">
+                <span id="volume-value">70%</span>
+            </div>
+            <div class="slider-group">
+                <span class="toggle-label">Size</span>
+                <input type="range" id="size-slider" min="40" max="400" value="200">
+                <span id="size-value">200px</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Start/Stop and Reset buttons -->
+    <div class="button-bar">
+        <button id="toggle-btn">Start</button>
+        <button id="reset">Reset</button>
+    </div>
+
+    <!-- Main timer display -->
+    <div class="main">
+        <div id="display">00:00:00</div>
+    </div>
+
+    <!-- Modal for configuring additional countdown intervals (2–6) -->
+    <div id="intermediate-modal" class="modal">
+        <div class="modal-content">
+            <h2 style="text-align:center; color:var(--neon); text-shadow:0 0 10px var(--neon);">Additional Intervals</h2>
+            <p style="text-align:center; margin:10px 0 20px; font-size:14px; color:var(--neon); text-shadow:0 0 10px var(--neon);">Intervals 2–6 (each adds to the total countdown time)</p>
+            <div id="intermediate-list"></div>
+            <div class="modal-footer">
+                <button class="save-btn" id="save-modal">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /* ========================
+           Variable Declarations
+           ======================== */
+        let neonColor = '#00ffff';                    // Initial neon color (cyan)
+        document.documentElement.style.setProperty('--neon', neonColor);
+
+        let time = 0;                                 // Current timer value in seconds
+        let interval = null;                          // setInterval reference for the timer
+        let isRunning = false;                        // Timer running state
+        let volume = 0.7;                             // Current volume (0–1)
+
+        // DOM element references
+        const display = document.getElementById('display');
+        const upToggle = document.getElementById('up-toggle');
+        const downToggle = document.getElementById('down-toggle');
+        const visualToggle = document.getElementById('visual-toggle');
+        const audibleToggle = document.getElementById('audible-toggle');
+        const downInputs = document.getElementById('down-inputs');
+        const hoursInput = document.getElementById('hours');
+        const minutesInput = document.getElementById('minutes');
+        const secondsInput = document.getElementById('seconds');
+        const addIntermediateBtn = document.getElementById('add-intermediate');
+        const modal = document.getElementById('intermediate-modal');
+        const saveModalBtn = document.getElementById('save-modal');
+        const intermediateList = document.getElementById('intermediate-list');
+        const sizeSlider = document.getElementById('size-slider');
+        const sizeValue = document.getElementById('size-value');
+        const colorSlider = document.getElementById('color-slider');
+        const volumeSlider = document.getElementById('volume-slider');
+        const volumeValue = document.getElementById('volume-value');
+        const volumeGroup = document.getElementById('volume-slider-group');
+        const toggleBtn = document.getElementById('toggle-btn');
+        const resetBtn = document.getElementById('reset');
+
+        // Array of up to 6 intervals (index 0 = main interval, 1–5 = additional)
+        let intervals = [
+            {enabled: true, seconds: 0},   // Interval 1 (always shown)
+            {enabled: false, seconds: 0},
+            {enabled: false, seconds: 0},
+            {enabled: false, seconds: 0},
+            {enabled: false, seconds: 0},
+            {enabled: false, seconds: 0}
+        ];
+
+        let triggerPoints = new Set();         // Times (in seconds) when an alarm should trigger in countdown mode
+
+        /* ========================
+           Utility Functions
+           ======================== */
+
+        // Format seconds into HH:MM:SS string
+        function formatTime(t) {
+            const h = Math.floor(t / 3600).toString().padStart(2, '0');
+            const m = Math.floor((t % 3600) / 60).toString().padStart(2, '0');
+            const s = (t % 60).toString().padStart(2, '0');
+            return `${h}:${m}:${s}`;
+        }
+
+        // Update the main display with current time
+        function updateDisplay() {
+            display.textContent = formatTime(time);
+        }
+
+        // Update display font size based on slider
+        function updateSize() {
+            const size = sizeSlider.value + 'px';
+            display.style.fontSize = size;
+            sizeValue.textContent = size;
+        }
+
+        // Update neon color based on hue slider
+        function updateColor() {
+            const hue = colorSlider.value;
+            neonColor = `hsl(${hue}, 100%, 50%)`;
+            document.documentElement.style.setProperty('--neon', neonColor);
+        }
+
+        // Update volume value and display
+        function updateVolume() {
+            volume = volumeSlider.value / 100;
+            volumeValue.textContent = volumeSlider.value + '%';
+        }
+
+        // Return current mode: 'up' or 'down'
+        function getMode() {
+            return downToggle.checked ? 'down' : 'up';
+        }
+
+        // Calculate total enabled interval time in seconds
+        function calculateTotalTime() {
+            let total = 0;
+            for (let intv of intervals) {
+                if (intv.enabled) total += intv.seconds;
+            }
+            return total;
+        }
+
+        // Check if any countdown intervals are active
+        function hasActiveIntervals() {
+            return calculateTotalTime() > 0;
+        }
+
+        /* ========================
+           Alarm Handling
+           ======================== */
+
+        // Enforce rule: at least one alarm (visual or audible) must be on when countdown intervals are set
+        function enforceAlarmRule() {
+            if (!hasActiveIntervals()) return;
+            const visualOn = visualToggle.checked;
+            const audibleOn = audibleToggle.checked;
+            if (!visualOn && !audibleOn) {
+                visualToggle.checked = true; // Default to visual if both are off
+            }
+        }
+
+        // Trigger visual and/or audible alarm
+        function triggerAlarm() {
+            if (visualToggle.checked) display.classList.add('flash');
+            if (audibleToggle.checked) startPulsingBeep();
+            setTimeout(stopAlarm, 5000); // Auto-stop after 5 seconds
+        }
+
+        // Stop all alarm effects
+        function stopAlarm() {
+            display.classList.remove('flash');
+            stopPulsingBeep();
+        }
+
+        // Audio variables
+        let audioCtx = null;
+        let oscillator = null;
+        let gainNode = null;
+        let beepActive = false;
+
+        // Play a series of soft beeps using Web Audio API
+        function startPulsingBeep() {
+            if (beepActive) return;
+            beepActive = true;
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const now = audioCtx.currentTime;
+
+            oscillator = audioCtx.createOscillator();
+            oscillator.type = 'sine';              // Soft tone
+            oscillator.frequency.value = 600;
+
+            gainNode = audioCtx.createGain();
+            gainNode.gain.value = 0;
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            const beepDuration = 0.15;
+            const gap = 0.35;
+            const maxGain = volume * 0.5;
+
+            for (let i = 0; i < 4; i++) {
+                const startTime = now + i * (beepDuration + gap);
+                const endTime = startTime + beepDuration;
+                gainNode.gain.setValueAtTime(0, startTime);
+                gainNode.gain.linearRampToValueAtTime(maxGain, startTime + 0.02);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, endTime);
+            }
+
+            oscillator.start(now);
+            oscillator.stop(now + 4 * (beepDuration + gap));
+        }
+
+        // Stop the audible beep
+        function stopPulsingBeep() {
+            if (!beepActive) return;
+            beepActive = false;
+            if (oscillator) oscillator.stop();
+            if (audioCtx) audioCtx.close();
+            oscillator = gainNode = audioCtx = null;
+        }
+
+        // Check if current time matches a trigger point (for multi-interval countdown)
+        function checkAlarms() {
+            if (getMode() !== 'down' || !isRunning) return;
+            if (triggerPoints.has(time) || time === 0) {
+                triggerAlarm();
+            }
+        }
+
+        /* ========================
+           Timer Core Logic
+           ======================== */
+
+        // Main update function called every second
+        function update() {
+            const mode = getMode();
+            if (mode === 'up') {
+                time++;
+            } else {
+                time--;
+                if (time < 0) {
+                    time = 0;
+                    checkAlarms();      // Final alarm at zero
+                    stopTimer();
+                    return;
+                }
+            }
+            updateDisplay();
+            checkAlarms();
+        }
+
+        // Recalculate total time and alarm trigger points from enabled intervals
+        function calculateTotalAndTriggers() {
+            let total = 0;
+            triggerPoints.clear();
+            for (let intv of intervals) {
+                if (intv.enabled && intv.seconds > 0) {
+                    total += intv.seconds;
+                    triggerPoints.add(total);
+                }
+            }
+            return total;
+        }
+
+        // Start the timer
+        function startTimer() {
+            if (isRunning) return;
+            if (getMode() === 'down') {
+                const total = calculateTotalAndTriggers();
+                if (total > 0) time = total;
+            }
+            interval = setInterval(update, 1000);
+            isRunning = true;
+            toggleBtn.textContent = 'Stop';
+        }
+
+        // Stop the timer
+        function stopTimer() {
+            clearInterval(interval);
+            interval = null;
+            isRunning = false;
+            toggleBtn.textContent = 'Start';
+        }
+
+        // Toggle between start and stop
+        function toggleTimer() {
+            if (isRunning) stopTimer();
+            else startTimer();
+        }
+
+        /* ========================
+           Reset & UI Helpers
+           ======================== */
+
+        // Full reset of timer, intervals, and UI state
+        function fullReset() {
+            stopTimer();
+            stopAlarm();
+            time = 0;
+            triggerPoints.clear();
+            updateDisplay();
+            intervals.forEach((intv, i) => {
+                intv.seconds = 0;
+                intv.enabled = (i === 0);
+            });
+            hoursInput.value = minutesInput.value = secondsInput.value = 0;
+            upToggle.checked = true;
+            downToggle.checked = false;
+            showDownInputs(false);
+        }
+
+        // Show/hide countdown inputs when switching modes
+        function showDownInputs(show) {
+            downInputs.style.display = show ? 'flex' : 'none';
+            addIntermediateBtn.style.display = show ? 'inline' : 'none';
+        }
+
+        // Update main interval (Interval 1) from input fields
+        function updateInterval0() {
+            const h = parseInt(hoursInput.value || 0);
+            const m = parseInt(minutesInput.value || 0);
+            const s = parseInt(secondsInput.value || 0);
+            intervals[0].seconds = h * 3600 + m * 60 + s;
+            enforceAlarmRule();
+        }
+
+        /* ========================
+           Additional Intervals Modal
+           ======================== */
+
+        // Create a row for an additional interval in the modal
+        function createIntervalRow(index) {
+            const row = document.createElement('div');
+            row.className = 'intermediate-row';
+            row.classList.toggle('enabled', intervals[index].enabled);
+
+            const label = document.createElement('span');
+            label.className = 'interval-label';
+            label.textContent = `Interval ${index + 1}:`;
+
+            // Enable/disable toggle
+            const switchLabel = document.createElement('label');
+            switchLabel.className = 'switch';
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.checked = intervals[index].enabled;
+            checkbox.addEventListener('change', () => {
+                intervals[index].enabled = checkbox.checked;
+                row.classList.toggle('enabled', checkbox.checked);
+                enforceAlarmRule();
+            });
+            switchLabel.appendChild(checkbox);
+            switchLabel.appendChild(document.createElement('span')).className = 'slider';
+
+            // Time inputs (hours : minutes : seconds)
+            const timeInputs = document.createElement('div');
+            timeInputs.className = 'time-inputs';
+
+            ['hours', 'minutes', 'seconds'].forEach((unit, i) => {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'number-wrapper';
+
+                const input = document.createElement('input');
+                input.type = 'number';
+                input.min = 0;
+                if (unit !== 'hours') input.max = 59;
+
+                // Initial value based on stored seconds
+                if (unit === 'hours') input.value = Math.floor(intervals[index].seconds / 3600);
+                else if (unit === 'minutes') input.value = Math.floor(intervals[index].seconds / 60) % 60;
+                else input.value = intervals[index].seconds % 60;
+
+                const upBtn = document.createElement('button');
+                upBtn.className = 'spin-up';
+                upBtn.textContent = '▲';
+                const downBtn = document.createElement('button');
+                downBtn.className = 'spin-down';
+                downBtn.textContent = '▼';
+
+                wrapper.appendChild(input);
+                wrapper.appendChild(upBtn);
+                wrapper.appendChild(downBtn);
+                timeInputs.appendChild(wrapper);
+
+                if (i < 2) {
+                    const colon = document.createElement('span');
+                    colon.textContent = ':';
+                    timeInputs.appendChild(colon);
+                }
+
+                // Update stored seconds when input changes
+                input.addEventListener('change', updateSeconds);
+
+                // Spin buttons
+                upBtn.addEventListener('click', () => changeValue(input, 1));
+                downBtn.addEventListener('click', () => changeValue(input, -1));
+            });
+
+            function updateSeconds() {
+                const inputs = row.querySelectorAll('input[type=number]');
+                const h = parseInt(inputs[0].value || 0);
+                const m = parseInt(inputs[1].value || 0);
+                const s = parseInt(inputs[2].value || 0);
+                intervals[index].seconds = h * 3600 + m * 60 + s;
+                enforceAlarmRule();
+            }
+
+            function changeValue(input, delta) {
+                let val = parseInt(input.value || 0) + delta;
+                if (input.min) val = Math.max(parseInt(input.min), val);
+                if (input.max) val = Math.min(parseInt(input.max), val);
+                input.value = val;
+                updateSeconds();
+            }
+
+            row.appendChild(label);
+            row.appendChild(switchLabel);
+            row.appendChild(timeInputs);
+            return row;
+        }
+
+        // Open modal and populate with interval rows
+        function openModal() {
+            intermediateList.innerHTML = '';
+            for (let i = 1; i <= 5; i++) {
+                const row = createIntervalRow(i);
+                intermediateList.appendChild(row);
+            }
+            modal.style.display = 'flex';
+        }
+
+        /* ========================
+           Event Listeners
+           ======================== */
+
+        // Main interval input changes
+        hoursInput.addEventListener('change', updateInterval0);
+        minutesInput.addEventListener('change', updateInterval0);
+        secondsInput.addEventListener('change', updateInterval0);
+
+        // Spin buttons for main interval
+        document.querySelectorAll('#down-inputs .number-wrapper button').forEach(button => {
+            button.addEventListener('click', function() {
+                const input = this.parentElement.querySelector('input');
+                const delta = this.classList.contains('spin-up') ? 1 : -1;
+                let value = parseInt(input.value || 0) + delta;
+                if (input.min !== undefined) value = Math.max(parseInt(input.min), value);
+                if (input.max !== undefined) value = Math.min(parseInt(input.max), value);
+                input.value = value;
+                updateInterval0();
+            });
+        });
+
+        // Mode toggles
+        upToggle.addEventListener('change', () => {
+            if (upToggle.checked) downToggle.checked = false;
+            showDownInputs(false);
+        });
+
+        downToggle.addEventListener('change', () => {
+            if (downToggle.checked) upToggle.checked = false;
+            showDownInputs(downToggle.checked);
+        });
+
+        // Audible alarm toggle – show/hide volume control
+        audibleToggle.addEventListener('change', () => {
+            volumeGroup.style.display = audibleToggle.checked ? 'flex' : 'none';
+        });
+
+        // Alarm rule enforcement on toggle
+        visualToggle.addEventListener('change', enforceAlarmRule);
+        audibleToggle.addEventListener('change', enforceAlarmRule);
+
+        // Slider controls
+        sizeSlider.addEventListener('input', updateSize);
+        colorSlider.addEventListener('input', updateColor);
+        volumeSlider.addEventListener('input', updateVolume);
+
+        // Main buttons
+        toggleBtn.addEventListener('click', toggleTimer);
+        resetBtn.addEventListener('click', fullReset);
+
+        // Modal controls
+        addIntermediateBtn.addEventListener('click', openModal);
+        saveModalBtn.addEventListener('click', () => {
+            modal.style.display = 'none';
+            enforceAlarmRule();
+        });
+        window.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.style.display = 'none';
+                enforceAlarmRule();
+            }
+        });
+
+        /* ========================
+           Initial Setup
+           ======================== */
+        showDownInputs(false);
+        addIntermediateBtn.style.display = 'none';
+        volumeGroup.style.display = audibleToggle.checked ? 'flex' : 'none';
+        updateDisplay();
+        updateSize();
+        updateColor();
+        updateVolume();
+    </script>
+</body>
+</html>
