@@ -440,9 +440,10 @@
         </div>
     </div>
 
-    <!-- Start/Stop and Reset buttons -->
+    <!-- Start/Stop, Pause/Resume and Reset buttons -->
     <div class="button-bar">
         <button id="toggle-btn">Start</button>
+        <button id="pause-btn">Pause</button>
         <button id="reset">Reset</button>
     </div>
 
@@ -473,6 +474,7 @@
         let time = 0;                                 // Current timer value in seconds
         let interval = null;                          // setInterval reference for the timer
         let isRunning = false;                        // Timer running state
+        let isPaused = false;                         // Timer paused state
         let volume = 0.7;                             // Current volume (0–1)
 
         // DOM element references
@@ -496,6 +498,7 @@
         const volumeValue = document.getElementById('volume-value');
         const volumeGroup = document.getElementById('volume-slider-group');
         const toggleBtn = document.getElementById('toggle-btn');
+        const pauseBtn = document.getElementById('pause-btn');
         const resetBtn = document.getElementById('reset');
 
         // Array of up to 6 intervals (index 0 = main interval, 1–5 = additional)
@@ -686,14 +689,12 @@
 
         // Start the timer
         function startTimer() {
-            if (isRunning) return;
-            if (getMode() === 'down') {
-                const total = calculateTotalAndTriggers();
-                if (total > 0) time = total;
-            }
+            if (interval !== null) return;
             interval = setInterval(update, 1000);
             isRunning = true;
+            isPaused = false;
             toggleBtn.textContent = 'Stop';
+            pauseBtn.textContent = 'Pause';
         }
 
         // Stop the timer
@@ -701,13 +702,48 @@
             clearInterval(interval);
             interval = null;
             isRunning = false;
+            isPaused = false;
             toggleBtn.textContent = 'Start';
+            pauseBtn.textContent = 'Pause';
+        }
+
+        // Pause the timer
+        function pauseTimer() {
+            if (!isRunning || isPaused) return;
+            clearInterval(interval);
+            interval = null;
+            isPaused = true;
+            pauseBtn.textContent = 'Resume';
+        }
+
+        // Resume the timer
+        function resumeTimer() {
+            if (!isRunning || !isPaused) return;
+            interval = setInterval(update, 1000);
+            isPaused = false;
+            pauseBtn.textContent = 'Pause';
+        }
+
+        // Toggle pause/resume
+        function togglePause() {
+            if (isPaused) {
+                resumeTimer();
+            } else {
+                pauseTimer();
+            }
         }
 
         // Toggle between start and stop
         function toggleTimer() {
-            if (isRunning) stopTimer();
-            else startTimer();
+            if (isRunning) {
+                stopTimer();
+            } else {
+                if (getMode() === 'down') {
+                    const total = calculateTotalAndTriggers();
+                    if (total > 0 && time === 0) time = total;  // Only reset time if starting fresh (time===0)
+                }
+                startTimer();
+            }
         }
 
         /* ========================
@@ -729,6 +765,7 @@
             upToggle.checked = true;
             downToggle.checked = false;
             showDownInputs(false);
+            pauseBtn.textContent = 'Pause';
         }
 
         // Show/hide countdown inputs when switching modes
@@ -900,6 +937,7 @@
 
         // Main buttons
         toggleBtn.addEventListener('click', toggleTimer);
+        pauseBtn.addEventListener('click', togglePause);
         resetBtn.addEventListener('click', fullReset);
 
         // Modal controls
@@ -931,6 +969,7 @@
         updateSize();
         updateColor();
         updateVolume();
+        pauseBtn.textContent = 'Pause';  // Ensure initial text
     </script>
 </body>
 </html>
